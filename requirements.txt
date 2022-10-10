@@ -13,3 +13,5 @@ djangorestframework-simplejwt
 drf-yasg
 django-rest-registration
 django-cors-headers
+django-import-export
+xhtml2pdf

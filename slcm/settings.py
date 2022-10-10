@@ -43,6 +43,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_registration',
     "corsheaders",
+    'import_export',
+    "debug_toolbar",
     'drf_yasg',
     'custom_users',
     'entities',
@@ -51,6 +53,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    "debug_toolbar.middleware.DebugToolbarMiddleware",
     'django.contrib.sessions.middleware.SessionMiddleware',
     "corsheaders.middleware.CorsMiddleware",
     'django.middleware.common.CommonMiddleware',
@@ -60,6 +63,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+
+INTERNAL_IPS = [
+   
+    "127.0.0.1",
+   
+]
 
 ROOT_URLCONF = 'slcm.urls'
 
@@ -159,7 +168,7 @@ REST_REGISTRATION = {
 
 
 EMAIL_HOST = "smtp.ethereal.email"
-EMAIL_HOST_USER = "litzy.okeefe@ethereal.email"
-EMAIL_HOST_PASSWORD = "dCu5XXseUaBrnqFMZq"
+EMAIL_HOST_USER = "izabella.block9@ethereal.email"
+EMAIL_HOST_PASSWORD = "z3YQDn5rwF3vkzy9Gg"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True

@@ -1,4 +1,5 @@
 from datetime import datetime
+from email.policy import default
 import logging
 from django.db import models, transaction
 from django.contrib.auth import get_user_model
@@ -8,7 +9,7 @@ from django.dispatch import receiver
 from django.core.mail import send_mail
 
 
-from custom_users.model_choices import ADDRESS_TYPE, CAST, CURRENT_STATUS_STUDENT, GENDER, STATES
+from custom_users.model_choices import ADDRESS_TYPE, CAST, CURRENT_INSTITUTE_TYPE, CURRENT_STATUS_STUDENT, GENDER, STATES
 from entities.models import Institute
 
 # Create your models here.
@@ -19,8 +20,8 @@ class CommonInfo(models.Model):
     user = models.OneToOneField(get_user_model(), on_delete=models.CASCADE, related_name='app_user', blank=True)
     id = models.CharField(max_length=12, primary_key=True, blank=True)
     first_name = models.CharField(max_length=50, blank=False, null=False)
-    middle_name = models.CharField(max_length=50, blank=True, null=True)
-    last_name = models.CharField(max_length=50, blank=True, null=True)
+    middle_name = models.CharField(max_length=50, blank=True, default="")
+    last_name = models.CharField(max_length=50, blank=True, default="")
     gender = models.CharField(max_length=20, choices=GENDER, blank=False, null=False, default="Male")
     address_line = models.CharField(max_length=100, blank=False, null=False)
     city = models.CharField(max_length=50, blank=False, null=False)
@@ -28,13 +29,13 @@ class CommonInfo(models.Model):
     township = models.CharField(max_length=50, blank=False, null=False, help_text="Taluka/Tehsil")
     district = models.CharField(max_length=50, blank=False, null=False)
     state = models.CharField(max_length=5, blank=False, null=False, choices=STATES)
-    phone = models.CharField(max_length=10, blank=False, null=False, 
+    phone = models.CharField(max_length=10, blank=True, null=True, 
                              validators=[RegexValidator(regex='^[0-9]*$',
                                                         message='Number should only contains integers.')])
     father_phone = models.CharField(max_length=10, blank=False, null=False, 
                              validators=[RegexValidator(regex='^[0-9]*$',
                                                         message='Number should only contains integers.')])
-    mother_phone = models.CharField(max_length=10, blank=False, null=False, 
+    mother_phone = models.CharField(max_length=10, blank=True, null=True, 
                              validators=[RegexValidator(regex='^[0-9]*$',
                                                         message='Number should only contains integers.')])
     
@@ -51,7 +52,7 @@ class Student(CommonInfo):
     father_name = models.CharField(max_length=50, blank=True, null=True)
     mother_name = models.CharField(max_length=50, blank=True, null=True)
     father_aadhaar_id_number = models.CharField(max_length=12, blank=True, null=True)
-    mother_aaadhaar_id_number = models.CharField(max_length=12, blank=True, null=True)
+    mother_aadhaar_id_number = models.CharField(max_length=12, blank=True, null=True)
     father_occupation = models.CharField(max_length=50, default="Not Specified")
     mother_occuption = models.CharField(max_length=50, default='Housewife')
     age = models.IntegerField(validators=[MinValueValidator(4, "Can only add students above 4 years of age")], blank=True)
@@ -59,10 +60,10 @@ class Student(CommonInfo):
     age_appropiation_reason = models.TextField(blank=True, null=True)
     address_type = models.CharField(max_length=20, choices=ADDRESS_TYPE, blank=False, null=False, default="Rural")
     religion = models.CharField(max_length=50, blank=True, null=True)
-    cast = models.CharField(max_length=20, choices=CAST, blank=False, null=False, default="General")
+    caste = models.CharField(max_length=20, choices=CAST, blank=False, null=False, default="General")
     belong_to_bpl = models.BooleanField(default=False)
     active = models.BooleanField(default=True)
-    current_enrolled_type = models.CharField(max_length=20, choices=CURRENT_STATUS_STUDENT, blank=False, null=False, default="School")
+    current_enrolled_type = models.CharField(max_length=20, choices=CURRENT_INSTITUTE_TYPE, blank=False, null=False, default="School")
     current_status = models.CharField(max_length=50, blank=True, default="Studying", choices=CURRENT_STATUS_STUDENT)
     
     def save(self, *args, **kwargs):
@@ -82,7 +83,7 @@ class Student(CommonInfo):
             self.age = current_date.year - birth_year
         
         with transaction.atomic():
-            username = self.first_name+self.pin_code+self.father_aadhaar_id_number
+            username = self.first_name+self.pin_code+str(datetime.now())
             password = f"{self.first_name}{self.pin_code}"
             try:
                 self.user == None

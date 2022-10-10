@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import Student, InstituteAdmin, CentralEducationDepartment, StateEducationDepartment, DistrictEducationDepartment
 
+from entities.models import Institute
+from .models import Student, InstituteAdmin, CentralEducationDepartment, StateEducationDepartment, DistrictEducationDepartment
+from entities.serializers import InstituteSerializer
 class UserSerializer(serializers.Serializer):
     pass
     
@@ -15,13 +17,17 @@ class StudentSerializer(UserSerializer, serializers.ModelSerializer):
         fields = '__all__'
 
 class InstituteAdminSerializer(UserSerializer, serializers.ModelSerializer):
+    institute = serializers.SerializerMethodField()
+    def get_institute(self, obj):
+        return InstituteSerializer(obj.institute).data
+    
     user_type = serializers.SerializerMethodField()
     def get_user_type(self, obj):
         return "InstituteAdmin".upper()
     
     class Meta:
         model = InstituteAdmin
-        fields = '__all__'
+        fields = ['id', 'user_type', 'active', 'institute']
 
 class CentralEducationDepartmentSerializer(UserSerializer, serializers.ModelSerializer):
     user_type = serializers.SerializerMethodField()

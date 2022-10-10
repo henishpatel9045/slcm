@@ -1,7 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
-
+from django.core.mail import send_mail
 from custom_users.model_choices import ENROLLMENT_TYPES, STUDENT_STREAM_STAUS
 from entities.models import College, School
 
@@ -23,6 +23,8 @@ class TransferCertificate(models.Model):
                                            validators=[MinValueValidator(1), 
                                                        MaxValueValidator(12)])
     paid_all_fees = models.BooleanField(default=True)
+    remaining_fees = models.DecimalField(default=0.0, blank=True, decimal_places=2, max_digits=8)
+    
     comment = models.TextField(blank=True, null=True)
     date_of_admission = models.DateField(blank=True)
     should_promote = models.BooleanField(default=False)
@@ -32,32 +34,51 @@ class TransferCertificate(models.Model):
     def save(self, *args, **kwargs):
         if not self.transfer_id:
             self.transfer_id = f'TC{timezone.now().year % 100}{self.student.pk}{self.generated_by.pk}'
+            
+        
+        subject = "Transfer Certificate Generated."
+        message = f"""Transfer Certificate ID: {self.transfer_id},
+                    Student ID: {self.student.id},
+                    Generating Institute ID: {self.generated_by.institute_id},
+                    CurrentStandard: {self.current_standard},
+                    Should Promoted: {self.should_promote},
+                    Institute admission date: {self.date_of_admission},
+                    Institute Leaving date: {self.created_at},
+                    Comment by institute admin: {self.comment}
+        """
+        receiver_mail = self.user.email
+        
+        try:
+            send_mail(subject=subject, message=message, recipient_list=[receiver_mail], from_email="reset.slcm@edu.com")
+        except Exception as e:
+            pass
+        
         super().save(*args, **kwargs)
         
         
-class Attendance(models.Model):
-    student = models.ForeignKey('custom_users.Student', 
-                                on_delete=models.CASCADE, 
-                                related_name='attendance')
-    institute = models.ForeignKey('entities.Institute', 
-                                  on_delete=models.CASCADE, 
-                                  related_name='attendance')
-    month = models.IntegerChoices('month', 
-                                  'JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC')
-    year = models.IntegerField(default=2021, 
-                               validators=[MinValueValidator(1800), 
-                                           MaxValueValidator(2100)])
-    attended_days = models.IntegerField(default=0, 
-                                        validators=[MinValueValidator(0),
-                                                    MaxValueValidator(31)])
-    working_days = models.IntegerField(default=0, 
-                                       validators=[MinValueValidator(0), 
-                                                   MaxValueValidator(31)])
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+# class Attendance(models.Model):
+#     student = models.ForeignKey('custom_users.Student', 
+#                                 on_delete=models.CASCADE, 
+#                                 related_name='attendance')
+#     institute = models.ForeignKey('entities.Institute', 
+#                                   on_delete=models.CASCADE, 
+#                                   related_name='attendance')
+#     month = models.IntegerChoices('month', 
+#                                   'JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC')
+#     year = models.IntegerField(default=2021, 
+#                                validators=[MinValueValidator(1800), 
+#                                            MaxValueValidator(2100)])
+#     attended_days = models.IntegerField(default=0, 
+#                                         validators=[MinValueValidator(0),
+#                                                     MaxValueValidator(31)])
+#     working_days = models.IntegerField(default=0, 
+#                                        validators=[MinValueValidator(0), 
+#                                                    MaxValueValidator(31)])
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
     
-    class Meta:
-        unique_together = ('student', 'institute')
+#     class Meta:
+#         unique_together = ('student', 'institute')
 
 
 class Enrollement(models.Model):
@@ -161,3 +182,5 @@ class StudentSubject(models.Model):
     
     class Meta:
         unique_together = ('student', 'subject', 'standard')
+        
+        

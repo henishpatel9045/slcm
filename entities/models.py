@@ -29,7 +29,7 @@ class Institute(models.Model):
     
 @receiver(post_save, sender=Institute)
 def create_institute_id(sender, instance, created, **kwargs):
-    instance.institute_id = f"{instance.state}{(8-len(str(instance.pk)))*'0'}{instance.pk}"
+    instance.institute_id = f"I{instance.state}{(8-len(str(instance.pk)))*'0'}{instance.pk}"
     Institute.objects.filter(pk=instance.pk).update(institute_id=instance.institute_id)
     
     

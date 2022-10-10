@@ -3,13 +3,21 @@ from sre_parse import State
 from wsgiref import validate
 from rest_framework import status, views, mixins, viewsets, permissions
 from rest_framework.response import Response
+from custom_users.resources import StudentResources
+
+from django.shortcuts import HttpResponse
+
+from slcm.common_serializers import PaginatorSerializer
 from .models import CentralEducationDepartment, DistrictEducationDepartment, ResetOTP, StateEducationDepartment, Student, InstituteAdmin
 from .serializers import CentralEducationDepartmentSerializer, DistrictEduSerializer, InstituteAdminSerializer, StateEduSerializer, StudentSerializer
 import logging
 from django.contrib.auth.forms import PasswordResetForm
 from django.core.mail import send_mail
+from operations.models import Enrollement
 
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, logout
+from django.utils import timezone
+from django.db import transaction
 
 from django.contrib.auth.password_validation import password_changed, validate_password
 from django.contrib.auth.hashers import check_password
@@ -18,25 +26,11 @@ logging.getLogger(__name__)
 
 
 # Create your views here.
-class StudentDetailViewSet(viewsets.ModelViewSet):
+class StudentDetailViewSet(PaginatorSerializer):
     serializer_class = StudentSerializer
-    queryset = Student.objects.all()
+    queryset = Student.objects.select_related("user").all()
     permission_classes = [permissions.IsAuthenticated]
-    
-    def list(self, request):
-        page_size = int(self.request.GET.get("page_size", 20))
-        page_size = int(self.request.GET.get("page_number", 1))
-        
-        queryset = self.filter_queryset(self.get_queryset())
-        
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True)
-        return Response(serializer.data)
-    
+    lookup_field = 'id'
     
     def get_queryset(self):
         qs = self.queryset
@@ -45,7 +39,7 @@ class StudentDetailViewSet(viewsets.ModelViewSet):
             qs = Student.objects.filter(user=user)
         elif hasattr(user, 'institute_admin'):
             qs = Student.objects.filter(enrollement__is_active=True, 
-                                        enrollment__institute=user.institute_admin.institute)
+                                        enrollement__institute=user.institute_admin.institute)
         elif hasattr(user, 'central_edu'):
             qs = Student.objects.all()
         elif hasattr(user, 'state_edu'):
@@ -54,10 +48,52 @@ class StudentDetailViewSet(viewsets.ModelViewSet):
             qs = Student.objects.filter(state=user.district_edu.state,
                                         district=user.district_edu.district)
         
-        
         logging.info(self.request.user, self.request.user.is_staff)
         return qs
     
+    # def list(self, request):
+    #     page_size = int(self.request.GET.get("page_size", 20))
+    #     page_number = int(self.request.GET.get("page_number", 1))
+        
+    #     if page_size < 1:
+    #         page_size = 1
+        
+    #     if page_number < 1:
+    #         page_number = 1
+        
+    #     start = (page_number-1) * page_size
+    #     end = page_size * page_number
+    #     total_entries = self.get_queryset().count()
+    #     queryset = self.filter_queryset(self.get_queryset()[start:end])
+        
+    #     return_entries = queryset.count()
+        
+    #     page = self.paginate_queryset(queryset)
+    #     if page is not None:
+    #         serializer = self.get_serializer(page, many=True)
+    #         return self.get_paginated_response(serializer.data)
+
+    #     serializer = self.get_serializer(queryset, many=True)
+    #     return Response({"data": serializer.data, "total_entries": total_entries, "return_entries": return_entries})
+    
+    
+    def create(self, request, *args, **kwargs):
+        with transaction.atomic():
+            user = self.request.user
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+            student = serializer.save()
+            headers = self.get_success_headers(serializer.data)
+            
+            enrollment = Enrollement()
+            enrollment.student = student
+            enrollment.institute = user.institute_admin.institute
+            enrollment.current_year = 1
+            enrollment.date_of_admission = timezone.now().date()
+            enrollment.save()
+        
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        
 
 class UserDetails(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -72,19 +108,19 @@ class UserDetails(views.APIView):
         
         if hasattr(user, 'app_user'):
             serializer = StudentSerializer
-            qs = Student.objects.get(user=user)
+            qs = Student.objects.select_related("user").get(user=user)
         elif hasattr(user, 'institute_admin'):
             serializer = InstituteAdminSerializer
-            qs = InstituteAdmin.objects.get(user=user)
+            qs = InstituteAdmin.objects.select_related("institute").select_related("user").get(user=user)
         elif hasattr(user, 'central_edu'):
             serializer = CentralEducationDepartmentSerializer
-            qs = CentralEducationDepartment.objects.get(user=user)
+            qs = CentralEducationDepartment.objects.select_related("user").get(user=user)
         elif hasattr(user, 'state_edu'):
             serializer = StateEduSerializer
-            qs = StateEducationDepartment.objects.get(user=user)
+            qs = StateEducationDepartment.objects.select_related("user").get(user=user)
         elif hasattr(user, 'district_edu'):
             serializer = DistrictEduSerializer
-            qs = DistrictEducationDepartment.objects.get(user=user)
+            qs = DistrictEducationDepartment.objects.select_related("user").get(user=user)
         
         if serializer:
             data = serializer(qs)   
@@ -97,7 +133,7 @@ class GenerateResetOTP(views.APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
-        user = self.request.user
+        user = get_user_model().objects.get(username=request.data.get("username"))
         try:
             ResetOTP.objects.create(user=user, otp=random.randint(1111, 9999))
         except Exception as e:
@@ -132,4 +168,28 @@ class PasswordReset(views.APIView):
         return Response({"detail": f"PAssword changed for user {user.username}. New password is {password}", "success": True}, status=status.HTTP_200_OK)
         
         
+
+class Logout(views.APIView):
+    def post(self, request):
+        try:
+            logout(request)
+        except Exception as e:
+            return Response({"error": str(e.args[0]), 'status': False}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"status": True}, status=status.HTTP_200_OK)
+    
+    
+# class DashboardView(views.APIView):
+    
+class ExportStudent(views.APIView):
+    def get(self, request):
+        print(request.user)
+        user = request.user
+        print(user)
+        qs = Student.objects.filter(enrollement__institute=user.institute_admin.institute, enrollement__is_active=True)
+        person_resource = StudentResources()
+        dataset = person_resource.export()
+        response = HttpResponse(dataset.xlsx, content_type='application/vnd.ms-excel')
+        response['Content-Disposition'] = 'attachment; filename="Students.xlsx"'
+        return response 
+
     
