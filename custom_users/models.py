@@ -65,7 +65,8 @@ class Student(CommonInfo):
     active = models.BooleanField(default=True)
     current_enrolled_type = models.CharField(max_length=20, choices=CURRENT_INSTITUTE_TYPE, blank=False, null=False, default="School")
     current_status = models.CharField(max_length=50, blank=True, default="Studying", choices=CURRENT_STATUS_STUDENT)
-    
+    is_approved = models.BooleanField(default=False)
+
     def save(self, *args, **kwargs):
         day = self.date_of_birth.day
         birth_month = self.date_of_birth.month
@@ -248,3 +249,50 @@ class ResetOTP(models.Model):
         except Exception as e:
             pass
         
+
+
+class StudentChangeRequest(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    first_name = models.CharField(max_length=50, blank=False, null=False)
+    middle_name = models.CharField(max_length=50, blank=True, default="")
+    last_name = models.CharField(max_length=50, blank=True, default="")
+    gender = models.CharField(max_length=20, choices=GENDER, blank=False, null=False, default="Male")
+    address_line = models.CharField(max_length=100, blank=False, null=False)
+    city = models.CharField(max_length=50, blank=False, null=False)
+    pin_code = models.CharField(max_length=6, blank=False, null=False)
+    township = models.CharField(max_length=50, blank=False, null=False, help_text="Taluka/Tehsil")
+    district = models.CharField(max_length=50, blank=False, null=False)
+    state = models.CharField(max_length=5, blank=False, null=False, choices=STATES)
+    phone = models.CharField(max_length=10, blank=True, null=True, 
+                             validators=[RegexValidator(regex='^[0-9]*$',
+                                                        message='Number should only contains integers.')])
+    father_phone = models.CharField(max_length=10, blank=False, null=False, 
+                             validators=[RegexValidator(regex='^[0-9]*$',
+                                                        message='Number should only contains integers.')])
+    mother_phone = models.CharField(max_length=10, blank=True, null=True, 
+                             validators=[RegexValidator(regex='^[0-9]*$',
+                                                        message='Number should only contains integers.')])
+    email = models.EmailField(null=True)
+    date_of_birth = models.DateField()
+    aadhaar_id_number = models.CharField(max_length=12, blank=True, null=True)
+    mother_tongue = models.CharField(max_length=50, blank=True, null=True)
+    father_name = models.CharField(max_length=50, blank=True, null=True)
+    mother_name = models.CharField(max_length=50, blank=True, null=True)
+    father_aadhaar_id_number = models.CharField(max_length=12, blank=True, null=True)
+    mother_aadhaar_id_number = models.CharField(max_length=12, blank=True, null=True)
+    father_occupation = models.CharField(max_length=50, default="Not Specified")
+    mother_occuption = models.CharField(max_length=50, default='Housewife')
+    address_type = models.CharField(max_length=20, choices=ADDRESS_TYPE, blank=False, null=False, default="Rural")
+    religion = models.CharField(max_length=50, blank=True, null=True)
+    caste = models.CharField(max_length=20, choices=CAST, blank=False, null=False, default="General")
+    belong_to_bpl = models.BooleanField(default=False)
+
+    is_approved = models.BooleanField(default=False)
+
+    created_on = models.DateTimeField(auto_now_add=True)
+    updated_on = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.student.first_name
+
+    
